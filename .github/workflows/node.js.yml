@@ -13,10 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: szenius/set-timezone@v1.2
-        with:
-          timezoneLinux: "Africa/Nairobi"
-
       - name: Set dotenv variable
         run: |
           export NODE_ENV=production
