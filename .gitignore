@@ -17,3 +17,8 @@ build/
 
 # Ignore npm lock file
 package-lock.json
+
+.env*
+.flaskenv*
+!.env.project
+!.env.vault
