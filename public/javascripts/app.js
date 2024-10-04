@@ -5,6 +5,7 @@ document.querySelectorAll(".cell").forEach((cell) => {
   cell.addEventListener("click", handleClick);
 });
 
+
 let currentPlayer;
 let myTurn = false; // Will be set when it's this client's turn
 let roomId;
