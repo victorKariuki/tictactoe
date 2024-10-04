@@ -9,7 +9,8 @@ const setupSocketIO = (httpServer) => {
     console.log("A player connected");
 
     // Handle matchmaking
-    socket.on("findMatch", () => {
+    socket.on("findMatch", (username) => {
+      // Receive username from client
       let roomId = null;
 
       // Find a room with only one player
@@ -32,7 +33,11 @@ const setupSocketIO = (httpServer) => {
 
       // Join the player to the room
       socket.join(roomId);
-      rooms[roomId].players.push(socket.id);
+      rooms[roomId].players.push({
+        id: socket.id,
+        username: username, // Store player's username
+        score: 0, // You can track scores or other states here
+      });
 
       socket.emit("joinedRoom", roomId);
 
@@ -41,6 +46,7 @@ const setupSocketIO = (httpServer) => {
         io.to(roomId).emit("startGame", {
           gameBoard: rooms[roomId].gameBoard,
           currentPlayer: rooms[roomId].currentPlayer,
+          players: rooms[roomId].players.map((p) => p.username), // Send usernames of both players
         });
       }
     });
@@ -55,9 +61,11 @@ const setupSocketIO = (httpServer) => {
 
         // Check for win or tie and send message to players
         if (checkWin(roomId)) {
+          const winner = rooms[roomId].players.find((p) => p.id === socket.id);
+          winner.score += 1; // Increase winner's score
           io.to(roomId).emit(
             "gameOver",
-            `${rooms[roomId].currentPlayer} wins!`
+            `${rooms[roomId].currentPlayer} (${winner.username}) wins! Score: ${winner.score}`
           );
           resetBoard(roomId);
         } else if (isBoardFull(roomId)) {
@@ -76,9 +84,11 @@ const setupSocketIO = (httpServer) => {
       console.log("A player disconnected");
       // Remove player from room if they disconnect
       for (let roomId in rooms) {
-        const index = rooms[roomId].players.indexOf(socket.id);
-        if (index !== -1) {
-          rooms[roomId].players.splice(index, 1);
+        const playerIndex = rooms[roomId].players.findIndex(
+          (p) => p.id === socket.id
+        );
+        if (playerIndex !== -1) {
+          rooms[roomId].players.splice(playerIndex, 1);
           if (rooms[roomId].players.length === 0) {
             delete rooms[roomId]; // Delete the room if no players left
           }

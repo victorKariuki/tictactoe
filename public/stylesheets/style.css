@@ -21,3 +21,51 @@ body {
   border: 1px solid #000;
   cursor: pointer;
 }
+
+/* Hint for player X */
+.cell.hint-x {
+  border-color: #00ff00;
+  /* Green border */
+  box-shadow: 0 0 10px 5px rgba(0, 255, 0, 0.5);
+  /* Green glow */
+  animation: pulse-x 1s infinite;
+}
+
+/* Hint for player O */
+.cell.hint-o {
+  border-color: #0000ff;
+  /* Blue border */
+  box-shadow: 0 0 10px 5px rgba(0, 0, 255, 0.5);
+  /* Blue glow */
+  animation: pulse-o 1s infinite;
+}
+
+/* Pulse animation for player X */
+@keyframes pulse-x {
+  0% {
+    box-shadow: 0 0 10px 5px rgba(0, 255, 0, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 15px 7px rgba(0, 255, 0, 0.7);
+  }
+
+  100% {
+    box-shadow: 0 0 10px 5px rgba(0, 255, 0, 0.5);
+  }
+}
+
+/* Pulse animation for player O */
+@keyframes pulse-o {
+  0% {
+    box-shadow: 0 0 10px 5px rgba(0, 0, 255, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 15px 7px rgba(0, 0, 255, 0.7);
+  }
+
+  100% {
+    box-shadow: 0 0 10px 5px rgba(0, 0, 255, 0.5);
+  }
+}

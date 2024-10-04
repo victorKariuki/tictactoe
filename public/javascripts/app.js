@@ -1,66 +1,182 @@
-const socket = io();
-
-// Handle click event on cells
 document.querySelectorAll(".cell").forEach((cell) => {
   cell.addEventListener("click", handleClick);
 });
 
+let currentPlayer = "X";
 
-let currentPlayer;
-let myTurn = false; // Will be set when it's this client's turn
-let roomId;
-
-socket.emit("findMatch"); // Request to find a match
-
-// Event listener for when a room is joined
-socket.on("joinedRoom", (id) => {
-  roomId = id; // Store the room ID
-});
-
-// Start the game
-socket.on("startGame", ({ gameBoard, currentPlayer: firstPlayer }) => {
-  currentPlayer = firstPlayer;
-  myTurn = currentPlayer === "X";
-  document.getElementById(
-    "status"
-  ).textContent = `It's ${currentPlayer}'s turn`;
-  updateBoard(gameBoard);
-});
-
-// Handle cell click
 function handleClick(event) {
-  if (!myTurn) return; // If it's not the player's turn, ignore the click
-
   const cell = event.target;
-  const index = cell.getAttribute("data-index");
 
-  // Send move to the server
-  socket.emit("makeMove", roomId, index);
+  if (cell.textContent !== " ") return;
+
+  cell.textContent = currentPlayer;
+
+  // Allow the rendering to happen first before checking win or tie
+  setTimeout(() => {
+    if (checkWin()) {
+      alert(`${currentPlayer} wins!`);
+      resetBoard();
+    } else if (isBoardFull()) {
+      alert("It's a tie!");
+      resetBoard();
+    } else {
+      // Switch player only if no one has won
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+
+      // Use recommender API to suggest a move for the next player
+      fetch("/recommend-move", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gameBoard: getGameBoard(),
+          currentPlayer: currentPlayer,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          const recommendedMove = data.recommendedMove;
+          document
+            .querySelectorAll(".cell")
+            [recommendedMove].classList.add("hint");
+        });
+    }
+  }, 0); // Delay checking to let rendering happen
 }
 
-// Update the board UI
-function updateBoard(gameBoard) {
-  document.querySelectorAll(".cell").forEach((cell, index) => {
-    cell.textContent = gameBoard[index];
+function getGameBoard() {
+  return Array.from(document.querySelectorAll(".cell")).map(
+    (cell) => cell.textContent
+  );
+}
+
+function checkWin() {
+  const cells = getGameBoard();
+  const winningCombinations = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // Rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // Columns
+    [0, 4, 8],
+    [2, 4, 6], // Diagonals
+  ];
+
+  return winningCombinations.some((combination) => {
+    const [a, b, c] = combination;
+    return (
+      cells[a] === currentPlayer &&
+      cells[a] === cells[b] &&
+      cells[a] === cells[c]
+    );
   });
 }
 
-// Listen for board updates from the server
-socket.on("updateBoard", (gameBoard) => {
-  updateBoard(gameBoard);
-});
+function isBoardFull() {
+  return Array.from(document.querySelectorAll(".cell")).every(
+    (cell) => cell.textContent !== " "
+  );
+}
 
-// Listen for current player updates from the server
-socket.on("currentPlayer", (player) => {
-  currentPlayer = player;
-  myTurn = currentPlayer === "X";
-  document.getElementById(
-    "status"
-  ).textContent = `It's ${currentPlayer}'s turn`;
-});
+function resetBoard() {
+  document
+    .querySelectorAll(".cell")
+    .forEach((cell) => (cell.textContent = " "));
+  currentPlayer = "X";
+}
+function handleClick(event) {
+  const cell = event.target;
 
-// Listen for game over messages
-socket.on("gameOver", (message) => {
-  alert(message);
-  myTurn = false; // Prevent any further moves until the board is reset
-});
+  if (cell.textContent !== " ") return;
+
+  cell.textContent = currentPlayer;
+
+  // Allow the rendering to happen first before checking win or tie
+  setTimeout(() => {
+    if (checkWin()) {
+      alert(`${currentPlayer} wins!`);
+      resetBoard();
+    } else if (isBoardFull()) {
+      alert("It's a tie!");
+      resetBoard();
+    } else {
+      // Switch player only if no one has won
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+
+      // Remove previous hint before setting a new one
+      removeHints();
+
+      // Use recommender API to suggest a move for the next player
+      fetch("/recommend-move", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gameBoard: getGameBoard(),
+          currentPlayer: currentPlayer,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          const recommendedMove = data.recommendedMove;
+          const hintClass = currentPlayer === "X" ? "hint-x" : "hint-o";
+          document
+            .querySelectorAll(".cell")
+            [recommendedMove].classList.add(hintClass);
+        });
+    }
+  }, 0); // Delay checking to let rendering happen
+}
+
+// Function to remove any hint classes from all cells
+function removeHints() {
+  document.querySelectorAll(".cell").forEach((cell) => {
+    cell.classList.remove("hint-x", "hint-o");
+  });
+}
+
+function getGameBoard() {
+  return Array.from(document.querySelectorAll(".cell")).map(
+    (cell) => cell.textContent
+  );
+}
+
+function checkWin() {
+  const cells = getGameBoard();
+  const winningCombinations = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8], // Rows
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8], // Columns
+    [0, 4, 8],
+    [2, 4, 6], // Diagonals
+  ];
+
+  return winningCombinations.some((combination) => {
+    const [a, b, c] = combination;
+    return (
+      cells[a] === currentPlayer &&
+      cells[a] === cells[b] &&
+      cells[a] === cells[c]
+    );
+  });
+}
+
+function isBoardFull() {
+  return Array.from(document.querySelectorAll(".cell")).every(
+    (cell) => cell.textContent !== " "
+  );
+}
+
+function resetBoard() {
+  document
+    .querySelectorAll(".cell")
+    .forEach((cell) => (cell.textContent = " "));
+  currentPlayer = "X";
+  removeHints(); // Clear hints on reset
+}
