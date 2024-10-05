@@ -3,7 +3,6 @@ const express = require("express");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
-// const helmet = require("helmet"); // Security middleware
 const indexRouter = require("./routes/index");
 
 const app = express();
@@ -18,14 +17,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
-// app.use(
-//   helmet.contentSecurityPolicy({
-//     directives: {
-//       defaultSrc: ["'self'"],
-//       scriptSrc: ["'self'", "https://cdn.socket.io"],
-//     },
-//   })
-// ); // Apply security middleware
 
 // Routes setup
 app.use("/", indexRouter);
