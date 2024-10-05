@@ -51,10 +51,14 @@ const readRecommendationsFile = async () => {
 
 // Function to execute the recommendation service
 const executeRecommendationService = () => {
-  const recommendScriptPath = path.join(__dirname, "../services/recommend.js");
+  const recommendScriptPath = path.join(__dirname, "../assets/recommend.nr");
   console.log("Starting recommend.js process...", recommendScriptPath);
 
-  const child = spawn("node", [recommendScriptPath], { stdio: "inherit" });
+  const child = spawn(
+    path.join(__dirname, "../assets/nuru"),
+    [recommendScriptPath],
+    { stdio: "inherit" }
+  );
 
   child.on("close", (code) => {
     console.log(`recommend.js process exited with code ${code}`);
@@ -141,7 +145,9 @@ router.get("/game-state", async (req, res) => {
     if (!gameState) {
       return res.status(404).send("Game state not found.");
     }
-
+    gameState.gameBoard = gameState.gameBoard.map((cell) => (cell === "" || cell === " " ? -1 : cell));
+    console.log("Game state retrieved successfully:", gameState);
+    
     res.json(gameState);
   } catch (err) {
     console.error("Error retrieving game state:", err);
@@ -150,9 +156,9 @@ router.get("/game-state", async (req, res) => {
 });
 
 // New endpoint to post a recommended move and save it to the file
-router.post("/recommended-move", async (req, res) => {
+router.post("/recommend-a-move", async (req, res) => {
   const move = req.body;
-
+  move.timestamp = new Date().toISOString();
   try {
     await writeJsonFile(recommendedMoveFilePath, move);
     res.json({ message: "Recommended move saved successfully." });

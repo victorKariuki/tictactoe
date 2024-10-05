@@ -52,67 +52,60 @@ const checkWin = (gameBoard, currentPlayer) => {
     [2, 4, 6],
   ];
 
-  // Use a for loop to iterate over each winning combination
-  for (let i = 0; i < winningCombinations.length; i++) {
-    const [a, b, c] = winningCombinations[i];
-
-    if (
+  return winningCombinations.some((combination) => {
+    const [a, b, c] = combination;
+    return (
       gameBoard[a] === currentPlayer &&
       gameBoard[b] === currentPlayer &&
       gameBoard[c] === currentPlayer
-    ) {
-      return true; // Found a winning combination
-    }
-  }
-
-  return false; // No winning combination found
+    );
+  });
 };
-
 
 // Function to recommend a move
 const recommendMove = (gameBoard, currentPlayer) => {
   const opponent = currentPlayer === "X" ? "O" : "X";
 
   // Check if the current player can win
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      const hypotheticalBoard = [...gameBoard];
-      hypotheticalBoard[i] = currentPlayer;
-      if (checkWin(hypotheticalBoard, currentPlayer)) {
-        return i; // Return winning move
+  const winningMove = gameBoard
+    .map((cell, index) => {
+      if (cell === " ") {
+        const hypotheticalBoard = [...gameBoard];
+        hypotheticalBoard[index] = currentPlayer;
+        return checkWin(hypotheticalBoard, currentPlayer) ? index : null;
       }
-    }
-  }
+      return null;
+    })
+    .find((move) => move !== null);
+
+  if (winningMove !== undefined) return winningMove;
 
   // Check if the opponent can win and we need to block
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      const hypotheticalBoard = [...gameBoard];
-      hypotheticalBoard[i] = opponent;
-      if (checkWin(hypotheticalBoard, opponent)) {
-        return i; // Return blocking move
+  const blockingMove = gameBoard
+    .map((cell, index) => {
+      if (cell === " ") {
+        const hypotheticalBoard = [...gameBoard];
+        hypotheticalBoard[index] = opponent;
+        return checkWin(hypotheticalBoard, opponent) ? index : null;
       }
-    }
-  }
+      return null;
+    })
+    .find((move) => move !== null);
+
+  if (blockingMove !== undefined) return blockingMove;
 
   // If no immediate win/block, recommend center or corners
   const preferredMoves = [4, 0, 2, 6, 8]; // Center and corners first
-  for (let i = 0; i < preferredMoves.length; i++) {
-    if (gameBoard[preferredMoves[i]] === " ") {
-      return preferredMoves[i]; // Return first available preferred move
-    }
-  }
+  const availablePreferredMove = preferredMoves.find(
+    (move) => gameBoard[move] === " "
+  );
+
+  if (availablePreferredMove !== undefined) return availablePreferredMove;
 
   // If no preferred move is available, take the first available
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      return i; // Return first available move
-    }
-  }
-
-  return null; // No moves available
+  const firstAvailableMove = gameBoard.findIndex((cell) => cell === " ");
+  return firstAvailableMove !== -1 ? firstAvailableMove : null; // Return null if no moves available
 };
-
 
 // Main function to execute the recommendation and saving
 const main = async () => {
