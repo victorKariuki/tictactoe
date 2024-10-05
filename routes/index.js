@@ -11,6 +11,30 @@ const recommendedMoveFilePath = path.join(
   "../assets/recommendedMove.json"
 );
 
+// Function to write JSON data to a file
+const writeJsonFile = async (filePath, data) => {
+  try {
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+    console.log("Data saved successfully:", data);
+  } catch (err) {
+    console.error(`Error saving data to ${filePath}:`, err);
+  }
+};
+
+// Function to get the game state from the file
+const getGameStateFromFile = async () => {
+  try {
+    const data = await fs.readFile(gameStateFilePath, "utf8");
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return null; // Return null if file doesn't exist
+    }
+    console.error("Error reading game state file:", err);
+    throw err; // Rethrow other errors
+  }
+};
+
 // Helper function to read the recommendations file
 const readRecommendationsFile = async () => {
   try {
@@ -122,6 +146,19 @@ router.get("/game-state", async (req, res) => {
   } catch (err) {
     console.error("Error retrieving game state:", err);
     res.status(500).send("Error retrieving game state.");
+  }
+});
+
+// New endpoint to post a recommended move and save it to the file
+router.post("/recommended-move", async (req, res) => {
+  const move = req.body;
+
+  try {
+    await writeJsonFile(recommendedMoveFilePath, move);
+    res.json({ message: "Recommended move saved successfully." });
+  } catch (err) {
+    console.error("Error saving recommended move:", err);
+    res.status(500).send("Error saving recommended move.");
   }
 });
 

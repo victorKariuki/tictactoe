@@ -9,7 +9,7 @@ const recommendedMoveFilePath = path.join(
 
 // Function to read the game state from a file
 const readJsonFile = async (filePath) => {
-  try {unda;
+  try {
     const data = await fs.readFile(filePath, "utf8");
     return JSON.parse(data);
   } catch (err) {
