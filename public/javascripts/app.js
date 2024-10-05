@@ -1,182 +1,210 @@
-document.querySelectorAll(".cell").forEach((cell) => {
-  cell.addEventListener("click", handleClick);
-});
+class Player {
+  constructor(symbol) {
+    this.symbol = symbol; // Symbol of the player (X or O)
+    this.agent = null; // Agent for the player (Human or Computer)
+  }
 
-let currentPlayer = "X";
+  makeMove(cell) {
+    cell.textContent = this.symbol; // Assign the symbol to the cell
+  }
+}
 
-function handleClick(event) {
-  const cell = event.target;
+class Game {
+  constructor() {
+    this.players = [new Player("X"), new Player("O")];
+    this.isHumanFirst = Math.random() < 0.5; // true if human goes first
+    // set agent for each player
+    this.players[0].agent = this.isHumanFirst ? "Human" : "Computer";
+    this.players[1].agent = this.isHumanFirst ? "Computer" : "Human";
+    this.currentPlayer = this.players[0];
+    this.init();
+  }
 
-  if (cell.textContent !== " ") return;
+  init() {
+    console.log(`Human player goes first: ${this.isHumanFirst}`);
+    console.log(`Current Player: ${this.currentPlayer.symbol}`);
 
-  cell.textContent = currentPlayer;
+    this.resetBoard();
+    this.updateTurnDisplay();
+    this.setUpEventListeners();
 
-  // Allow the rendering to happen first before checking win or tie
-  setTimeout(() => {
-    if (checkWin()) {
-      alert(`${currentPlayer} wins!`);
-      resetBoard();
-    } else if (isBoardFull()) {
-      alert("It's a tie!");
-      resetBoard();
-    } else {
-      // Switch player only if no one has won
-      currentPlayer = currentPlayer === "X" ? "O" : "X";
-
-      // Use recommender API to suggest a move for the next player
-      fetch("/recommend-move", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          gameBoard: getGameBoard(),
-          currentPlayer: currentPlayer,
-        }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          const recommendedMove = data.recommendedMove;
-          document
-            .querySelectorAll(".cell")
-            [recommendedMove].classList.add("hint");
-        });
+    // If the computer goes first, make a move
+    if (this.currentPlayer.agent === "Computer") {
+      this.switchPlayer();
+      this.suggestMove();
     }
-  }, 0); // Delay checking to let rendering happen
-}
+  }
 
-function getGameBoard() {
-  return Array.from(document.querySelectorAll(".cell")).map(
-    (cell) => cell.textContent
-  );
-}
+  setUpEventListeners() {
+    document.querySelectorAll(".cell").forEach((cell) => {
+      cell.addEventListener("click", (event) => this.handleClick(event));
+    });
+  }
 
-function checkWin() {
-  const cells = getGameBoard();
-  const winningCombinations = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8], // Rows
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8], // Columns
-    [0, 4, 8],
-    [2, 4, 6], // Diagonals
-  ];
+  updateTurnDisplay() {
+    const turnDisplay = document.getElementById("turn-display");
+    turnDisplay.textContent = `Current Turn: ${
+      this.currentPlayer.symbol === "X" ? "Human (X)" : "Computer (O)"
+    }`;
+  }
 
-  return winningCombinations.some((combination) => {
-    const [a, b, c] = combination;
-    return (
-      cells[a] === currentPlayer &&
-      cells[a] === cells[b] &&
-      cells[a] === cells[c]
-    );
-  });
-}
+  handleClick(event) {
+    const cell = event.target;
 
-function isBoardFull() {
-  return Array.from(document.querySelectorAll(".cell")).every(
-    (cell) => cell.textContent !== " "
-  );
-}
+    // Only allow the current player to play
+    if (
+      cell.textContent !== " " ||
+      (this.currentPlayer.symbol === "O" && this.isHumanFirst)
+    )
+      return;
 
-function resetBoard() {
-  document
-    .querySelectorAll(".cell")
-    .forEach((cell) => (cell.textContent = " "));
-  currentPlayer = "X";
-}
-function handleClick(event) {
-  const cell = event.target;
+    this.currentPlayer.makeMove(cell);
+    this.checkGameState();
+  }
 
-  if (cell.textContent !== " ") return;
+  async checkGameState() {
+    const winningCells = this.checkWin();
 
-  cell.textContent = currentPlayer;
-
-  // Allow the rendering to happen first before checking win or tie
-  setTimeout(() => {
-    if (checkWin()) {
-      alert(`${currentPlayer} wins!`);
-      resetBoard();
-    } else if (isBoardFull()) {
+    if (winningCells) {
+      this.highlightWinningCells(winningCells);
+      alert(`Player ${this.currentPlayer.symbol} wins!`);
+      this.resetBoard();
+    } else if (this.isBoardFull()) {
       alert("It's a tie!");
-      resetBoard();
+      this.resetBoard();
     } else {
-      // Switch player only if no one has won
-      currentPlayer = currentPlayer === "X" ? "O" : "X";
-
-      // Remove previous hint before setting a new one
-      removeHints();
-
-      // Use recommender API to suggest a move for the next player
-      fetch("/recommend-move", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          gameBoard: getGameBoard(),
-          currentPlayer: currentPlayer,
-        }),
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          const recommendedMove = data.recommendedMove;
-          const hintClass = currentPlayer === "X" ? "hint-x" : "hint-o";
-          document
-            .querySelectorAll(".cell")
-            [recommendedMove].classList.add(hintClass);
-        });
+      this.switchPlayer();
+      if (this.currentPlayer.symbol === "O") {
+        await this.suggestMove();
+      }
     }
-  }, 0); // Delay checking to let rendering happen
-}
+  }
 
-// Function to remove any hint classes from all cells
-function removeHints() {
-  document.querySelectorAll(".cell").forEach((cell) => {
-    cell.classList.remove("hint-x", "hint-o");
-  });
-}
+  switchPlayer() {
+    this.currentPlayer = this.currentPlayer === this.players[0] ? this.players[1] : this.players[0];
+    this.removeHints();
+    this.updateTurnDisplay(); // Update display for the new current player
 
-function getGameBoard() {
-  return Array.from(document.querySelectorAll(".cell")).map(
-    (cell) => cell.textContent
-  );
-}
+    // Show hints only for the computer's turn
+    if (this.currentPlayer.symbol === "O") {
+      this.showHints();
+    }
+  }
 
-function checkWin() {
-  const cells = getGameBoard();
-  const winningCombinations = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8], // Rows
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8], // Columns
-    [0, 4, 8],
-    [2, 4, 6], // Diagonals
-  ];
+  async suggestMove() {
+    try {
+      await this.saveCurrentGameState();
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Delay before fetching recommendation
+      const data = await this.fetchRecommendation();
+      this.fillInComputerMove(data.move);
+    } catch (error) {
+      console.error("Error fetching recommended move:", error);
+      alert(
+        "An error occurred while fetching the move recommendation. Please try again."
+      );
+    }
+  }
 
-  return winningCombinations.some((combination) => {
-    const [a, b, c] = combination;
-    return (
-      cells[a] === currentPlayer &&
-      cells[a] === cells[b] &&
-      cells[a] === cells[c]
+  async saveCurrentGameState() {
+    const saveResponse = await fetch("/recommend-move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gameBoard: this.getGameBoard(),
+        currentPlayer: this.currentPlayer.symbol,
+      }),
+    });
+
+    if (!saveResponse.ok) {
+      throw new Error("Failed to save recommendation");
+    }
+  }
+
+  async fetchRecommendation() {
+    const recommendationResponse = await fetch("/recommendation");
+    if (!recommendationResponse.ok) {
+      throw new Error("Failed to get recommendation");
+    }
+    return await recommendationResponse.json();
+  }
+
+  fillInComputerMove(recommendedMove) {
+    const cell = document.querySelectorAll(".cell")[recommendedMove];
+    if (cell && cell.textContent === " ") {
+      // Ensure the cell is empty
+      this.currentPlayer.makeMove(cell);
+      this.checkGameState(); // Check for win or tie after the computer's move
+    }
+  }
+
+  highlightWinningCells(cells) {
+    cells.forEach((index) => {
+      document.querySelectorAll(".cell")[index].classList.add("winning-cell");
+    });
+    this.resetBoard();
+  }
+
+  removeHints() {
+    document.querySelectorAll(".cell").forEach((cell) => {
+      cell.classList.remove("hint-x", "hint-o", "winning-cell");
+    });
+  }
+
+  showHints() {
+    const possibleMoves = this.getPossibleMoves();
+    possibleMoves.forEach((index) => {
+      document.querySelectorAll(".cell")[index].classList.add("hint-o"); // Add hint class for computer
+    });
+  }
+
+  getPossibleMoves() {
+    return Array.from(document.querySelectorAll(".cell"))
+      .map((cell, index) => (cell.textContent === " " ? index : null))
+      .filter((index) => index !== null);
+  }
+
+  getGameBoard() {
+    return Array.from(document.querySelectorAll(".cell")).map(
+      (cell) => cell.textContent
     );
-  });
+  }
+
+  checkWin() {
+    const cells = this.getGameBoard();
+    const winningCombinations = [
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8], // Rows
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8], // Columns
+      [0, 4, 8],
+      [2, 4, 6], // Diagonals
+    ];
+
+    for (const combination of winningCombinations) {
+      const [a, b, c] = combination;
+      if (cells[a] === cells[b] && cells[a] === cells[c] && cells[a] !== " ") {
+        return combination; // Return the winning combination
+      }
+    }
+    return null; // No winner found
+  }
+
+  isBoardFull() {
+    return Array.from(document.querySelectorAll(".cell")).every(
+      (cell) => cell.textContent !== " "
+    );
+  }
+
+  resetBoard() {
+    document.querySelectorAll(".cell").forEach((cell) => {
+      cell.textContent = " ";
+    });
+
+    this.updateTurnDisplay(); // Reset the turn display
+  }
 }
 
-function isBoardFull() {
-  return Array.from(document.querySelectorAll(".cell")).every(
-    (cell) => cell.textContent !== " "
-  );
-}
-
-function resetBoard() {
-  document
-    .querySelectorAll(".cell")
-    .forEach((cell) => (cell.textContent = " "));
-  currentPlayer = "X";
-  removeHints(); // Clear hints on reset
-}
+// Initialize the game when the script is loaded
+new Game();

@@ -39,6 +39,10 @@ body {
   /* Blue glow */
   animation: pulse-o 1s infinite;
 }
+.winning-cell {
+  background-color: rgba(0, 255, 0, 0.5);
+  /* Light green for winning cells */
+}
 
 /* Pulse animation for player X */
 @keyframes pulse-x {

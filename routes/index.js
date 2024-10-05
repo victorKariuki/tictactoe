@@ -1,10 +1,79 @@
 const express = require("express");
+const fs = require("fs/promises");
+const path = require("path");
+const { spawn } = require("child_process");
+
 const router = express.Router();
+
+const gameStateFilePath = path.join(__dirname, "../assets/gameState.json");
+const recommendedMoveFilePath = path.join(
+  __dirname,
+  "../assets/recommendedMove.json"
+);
+
+// Helper function to read the recommendations file
+const readRecommendationsFile = async () => {
+  try {
+    const data = await fs.readFile(recommendedMoveFilePath, "utf8");
+    return JSON.parse(data) || [];
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return []; // Return an empty array if file doesn't exist
+    }
+    console.error("Error reading recommendations file:", err);
+    throw err; // Rethrow other errors
+  }
+};
+
+// Function to execute the recommendation service
+const executeRecommendationService = () => {
+  const recommendScriptPath = path.join(__dirname, "../services/recommend.js");
+  console.log("Starting recommend.js process...", recommendScriptPath);
+
+  const child = spawn("node", [recommendScriptPath], { stdio: "inherit" });
+
+  child.on("close", (code) => {
+    console.log(`recommend.js process exited with code ${code}`);
+  });
+
+  child.on("error", (err) => {
+    console.error("Failed to start recommend.js:", err);
+  });
+};
+
+// Function to save game state to a file
+const saveGameState = async (gameBoard, currentPlayer) => {
+  const gameState = { gameBoard, currentPlayer };
+
+  try {
+    await fs.writeFile(gameStateFilePath, JSON.stringify(gameState, null, 2));
+    console.log("Game state saved successfully.");
+
+    // Introduce a delay before executing the recommendation service
+    setTimeout(executeRecommendationService, 1000); // Delay of 1000 milliseconds (1 second)
+  } catch (err) {
+    console.error("Error saving game state:", err);
+    throw err; // Rethrow the error for further handling
+  }
+};
+
+// Middleware for input validation
+const validateGameInput = (req, res, next) => {
+  const { gameBoard, currentPlayer } = req.body;
+  if (
+    !Array.isArray(gameBoard) ||
+    gameBoard.length !== 9 ||
+    !["X", "O"].includes(currentPlayer)
+  ) {
+    return res.status(400).send("Invalid game board or current player.");
+  }
+  next();
+};
 
 // Render the game UI
 router.get("/", (req, res) => {
   try {
-    const gameBoard = [" ", " ", " ", " ", " ", " ", " ", " ", " "];
+    const gameBoard = Array(9).fill(" "); // Initialize an empty game board
     res.render("index", { gameBoard });
   } catch (error) {
     console.error("Error rendering the game UI:", error);
@@ -12,77 +81,49 @@ router.get("/", (req, res) => {
   }
 });
 
-
-router.post("/recommend-move", (req, res) => {
+// Recommend a move for the current player
+router.post("/recommend-move", validateGameInput, async (req, res) => {
   const { gameBoard, currentPlayer } = req.body;
-  const recommendedMove = getRecommendedMove(gameBoard, currentPlayer);
-  res.json({ recommendedMove });
+
+  try {
+    await saveGameState(gameBoard, currentPlayer);
+    res.json({ message: "Game state saved. Ready for recommendation." });
+  } catch (err) {
+    res.status(500).send("Error saving game state.");
+  }
 });
 
-function getRecommendedMove(gameBoard, currentPlayer) {
-  const opponent = currentPlayer === "X" ? "O" : "X";
+// Get the latest recommendation
+router.get("/recommendation", async (req, res) => {
+  try {
+    const recommendations = await readRecommendationsFile();
 
-  // Check if current player can win
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      gameBoard[i] = currentPlayer;
-      if (checkWin(gameBoard, currentPlayer)) {
-        gameBoard[i] = " "; // Undo the move
-        return i;
-      }
-      gameBoard[i] = " "; // Undo the move
+    if (recommendations.length === 0) {
+      return res.status(404).send("No recommendations found.");
     }
-  }
 
-  // Check if current player needs to block the opponent
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      gameBoard[i] = opponent;
-      if (checkWin(gameBoard, opponent)) {
-        gameBoard[i] = " "; // Undo the move
-        return i;
-      }
-      gameBoard[i] = " "; // Undo the move
+    res.json(recommendations);
+  } catch (err) {
+    console.error("Error retrieving recommendations:", err);
+    res.status(500).send("Error retrieving recommendations.");
+  }
+});
+
+// New endpoint to get the game state from the file
+router.get("/game-state", async (req, res) => {
+  try {
+    const gameState = await getGameStateFromFile();
+
+    if (!gameState) {
+      return res.status(404).send("Game state not found.");
     }
+
+    res.json(gameState);
+  } catch (err) {
+    console.error("Error retrieving game state:", err);
+    res.status(500).send("Error retrieving game state.");
   }
+});
 
-  // If no immediate win/block, recommend center or corners
-  const preferredMoves = [4, 0, 2, 6, 8]; // Prioritize center, then corners
-  for (let move of preferredMoves) {
-    if (gameBoard[move] === " ") {
-      return move;
-    }
-  }
-
-  // If no preferred move is available, take the first available
-  for (let i = 0; i < gameBoard.length; i++) {
-    if (gameBoard[i] === " ") {
-      return i;
-    }
-  }
-}
-
-// Function to check if there's a win in the current state
-function checkWin(gameBoard, currentPlayer) {
-  const winningCombinations = [
-    [0, 1, 2],
-    [3, 4, 5],
-    [6, 7, 8], // Rows
-    [0, 3, 6],
-    [1, 4, 7],
-    [2, 5, 8], // Columns
-    [0, 4, 8],
-    [2, 4, 6], // Diagonals
-  ];
-
-  return winningCombinations.some((combination) => {
-    const [a, b, c] = combination;
-    return (
-      gameBoard[a] === currentPlayer &&
-      gameBoard[a] === gameBoard[b] &&
-      gameBoard[a] === gameBoard[c]
-    );
-  });
-}
-
+// Export the router module
 module.exports = router;
